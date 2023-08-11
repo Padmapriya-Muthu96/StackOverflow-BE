@@ -5,12 +5,14 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+var cors = require('cors');
 
 const app = express();
+app.use(cors())
 app.use(express.json());
 
 // Connecting  to MongoDB
-mongoose.connect('mongodb+srv://root:pp123@cluster0.70nqoe4.mongodb.net/', {
+mongoose.connect('mongodb+srv://pp123:p123@cluster0.70nqoe4.mongodb.net/', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
@@ -78,7 +80,7 @@ app.post('/stack/login', async (req, res) => {
       const token = jwt.sign({ userId: user._id }, 'your-secret-key');
   
       // res.json({ token });
-      res.json({ message: 'Signin successful' });
+      res.json({ message: 'Signin successful' , user, token});
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Internal server error' });
@@ -178,11 +180,25 @@ app.get('/stack/users', async (req, res) => {
 // creating a  question schema
 const questionSchema = new mongoose.Schema({
   title: String,
-  content: String,
+  details: String,
+  tags: String,
+  answers: [
+    {
+      text: String,
+    }
+  ],
+  comments: [
+    {
+    text: String,
+  }
+],
+ 
+  
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+
   views: {
     type: Number,
     default: 0,
@@ -193,18 +209,21 @@ const questionSchema = new mongoose.Schema({
   },
 });
 
-questionSchema.index({ title: 'text', content: 'text' });
+questionSchema.index({ title: 'text', details: 'text', tags: 'text', answers:'text', comments:'text' });
 
 const Question = mongoose.model('Question', questionSchema);
 
 // Create a new question
 app.post('/stack/questions', async (req, res) => {
   try {
-    const { title, content, userId } = req.body;
+    const { title, details, tags, answers, comments, userId } = req.body;
 
     const newQuestion = new Question({
       title,
-      content,
+      details,
+      tags,
+      answers,
+      comments,
       user: userId,
     });
 
@@ -226,6 +245,71 @@ app.get('/stack/questions', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+});
+//Get question by Question id
+
+app.get('/stack/questions/:questionId', async (req, res) => {
+try{
+  const { questionId } = req.params;
+  const question = await Question.findById(questionId);
+  if(!question){
+    return res.status(404).json({ message: 'Question not found' });
+    }
+    res.json({ question });
+  }
+  catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+);
+
+//post answer by question id
+
+app.post('/stack/questions/:questionId/answers', async (req, res) => {
+  try {
+    const { questionId } = req.params;
+    const { text } = req.body;
+    // Find the question by ID
+    const question = await Question.findById(questionId);
+    if (!question) {
+      return res.status(404).json({ message: 'Question not found' });
+    }
+     
+    // Add the new answer to the question's answers array
+    const newAnswer = { text };
+    question.answers.push(newAnswer);
+    await question.save();
+
+    res.json({ message: "Answer posted successfully.", answer: newAnswer });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+//post comments by question id
+
+app.post('/stack/questions/:questionId/comments', async (req, res) => {
+  try {
+    const { questionId } = req.params;
+    const { text } = req.body;
+    // Find the question by ID
+    const question = await Question.findById(questionId);
+    if (!question) {
+      return res.status(404).json({ message: 'Question not found' });
+    }
+     
+    // Add the new command to the question's 
+    const newComment = { text };
+    question.comments.push(newComment);
+    await question.save();
+
+    res.json({ message: "Comment posted successfully.", comments: newComment });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -273,11 +357,16 @@ app.get('/stack/search', async (req, res) => {
   try {
     const { keyword } = req.query;
 
+    // Check if the keyword is null or undefined
+    if (!keyword) {
+      return res.status(400).json({ message: 'Keyword is missing or invalid' });
+    }
+
     // Find questions with similar keywords
     const questions = await Question.find({
       $text: { $search: keyword },
     });
-
+console.log(res);
     res.json({ questions });
   } catch (error) {
     console.error(error);
@@ -287,44 +376,68 @@ app.get('/stack/search', async (req, res) => {
 
 const companies = [
   {
+    image:"https://cdn.iconscout.com/icon/free/png-256/free-zoho-282840.png",
     company: 'ZOHO',
+    location:'chennai',
     Role: 'Web Developer',
-    openings: '80'
+    openings: '80',
+    Apply:"https://careers.zohocorp.com/jobs/Careers"
   },
   {
+    image:"https://cdn.iconscout.com/icon/free/png-256/free-zoho-282840.png",
     company: 'ZOHO',
+    location:'chennai',
     Role: 'Front-end Developer',
-    openings: '120'
+    openings: '120',
+    Apply:"https://careers.zohocorp.com/jobs/Careers"
   },
   {
+    image:"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbw_RH3X4ij3S6dKQX_9wmRomcATpE2-6A2oTfsFP6Pqj8EDQ-StkoRb-cpZu6IKLC3K0&usqp=CAU",
     company: 'CTS',
+    location:'chennai',
     Role: 'Backend Developer',
-    openings: '60'
+    openings: '60',
+    Apply:"https://careers.cognizant.com/global/en"
   },
   {
+    image:"https://www.deccanherald.com/sites/dh/files/styles/largehorizontal/public/articleimages/2022/10/13/infosys-dh-1153267-1665679669.png?itok=p43w56kU",
     company: 'Infosys',
+    location:'chennai',
     Role: 'Java Developer',
-    openings: '500'
-  },
+    openings: '500',
+    Apply:"https://www.infosys.com/careers/apply.html"
+},
   {
+    image:"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbw_RH3X4ij3S6dKQX_9wmRomcATpE2-6A2oTfsFP6Pqj8EDQ-StkoRb-cpZu6IKLC3K0&usqp=CAU",
     company: 'CTS',
+    location:'chennai',
     Role: 'Accountant',
-    openings: '10'
+    openings: '10',
+    Apply:"https://careers.cognizant.com/global/en"
   },
   {
+    image:"https://d2q79iu7y748jz.cloudfront.net/s/_squarelogo/256x256/13b693b4dcc055d2344351b4c9a148e9",
     company: 'TCS',
+    location:'chennai',
     Role: 'Manager',
-    openings: '2'
+    openings: '2',
+    Apply:"https://www.tcs.com/careers"
   },
   {
+    image:"https://hindubabynames.info/downloads/wp-content/themes/hbn_download/download/information-technology-companies/hcl-logo.png",
     company: 'HCL',
+    location:'chennai',
     Role: 'Team Manager',
-    openings: '6'
+    openings: '6',
+    Apply:"https://www.hcltech.com/careers/Careers-in-india"
   },
   {
+    image:"https://content.jdmagicbox.com/comp/chennai/y6/044pxx44.xx44.090910140310.v4y6/catalogue/paragon-digital-services-pvt-ltd-mylapore-chennai-advertising-agencies-28in7v5-250.jpg",
     company: 'Paragon',
+    location:'chennai',
     Role: 'Team Lead',
-    openings: '8'
+    openings: '8',
+    Apply:"https://www.paragondigitalservices.com/careers/"
   }
 ];
 
@@ -343,19 +456,19 @@ app.get('/stackoverflow',(req,res)=>{
   res.send('Welcome to stackoverflow')
 })
 
-// //for logout
-// app.post('/stack/logout', (req, res) => {
+//for logout
+app.post('/stack/logout', (req, res) => {
 
-//   req.session.destroy((error) => {
-//     if (error) {
-//       console.error(error);
-//       res.status(500).json({ message: 'Logout failed' });
-//     } else {
-//       res.sendStatus(200);
-//     }
-//   });
-// });
-// Start the server
+  req.session.destroy((error) => {
+    if (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Logout failed' });
+    } else {
+      res.sendStatus(200);
+    }
+  });
+});
+//Start the server
 app.listen(3000, () => {
   console.log('Server started on port 3000');
 });
